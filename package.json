@@ -1,0 +1,35 @@
+{
+  "name": "ai-agents-api",
+  "version": "1.0.0",
+  "description": "Express.js + MongoDB API for AI Agents",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate:up": "migrate-mongo up",
+    "migrate:down": "migrate-mongo down",
+    "migrate:status": "migrate-mongo status",
+    "seed": "node seeders/index.js"
+  },
+  "keywords": [
+    "express",
+    "mongodb",
+    "api"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "migrate-mongo": "^11.0.0",
+    "nodemon": "^3.1.4"
+  }
+}
