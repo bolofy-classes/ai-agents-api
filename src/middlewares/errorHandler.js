@@ -27,8 +27,13 @@ function errorHandler(err, req, res, next) {
     message = `Duplicate value for field: ${field}`;
   }
 
-  if (config.env === 'development') {
+  // Log full stack only for genuine server errors (5xx). Handled client
+  // errors (4xx, e.g. "Gmail is not connected") are expected — log a concise
+  // line so the terminal doesn't look like the server crashed.
+  if (status >= 500) {
     console.error(err);
+  } else if (config.env === 'development') {
+    console.warn(`↩ ${status} ${req.method} ${req.originalUrl} — ${message}`);
   }
 
   return error(res, { message, status, errors });
