@@ -111,6 +111,26 @@ Body: ${(email.body || email.snippet || '').slice(0, 3000)}`;
 }
 
 /**
+ * Summarize a news article in one short sentence.
+ * @param {object} article { title, description, source }
+ * @returns {Promise<string>}
+ */
+async function summarizeArticle(article) {
+  const ai = getClient();
+  const prompt = `Summarize this news article in ONE clear sentence (max 25 words). Reply with only the sentence, no quotes or preamble.
+
+Title: ${article.title || ''}
+Source: ${article.source || ''}
+Description: ${(article.description || '').slice(0, 2000)}`;
+
+  const res = await ai.models.generateContent({
+    model: config.gemini.model,
+    contents: prompt,
+  });
+  return (res.text || '').trim();
+}
+
+/**
  * From a list of emails, suggest which are safe to bulk-delete
  * (promotions, social/notification noise, expired alerts, newsletters).
  * @param {Array<{gmailId, from, subject, snippet, unread}>} messages
@@ -158,4 +178,4 @@ ${list}`;
   }
 }
 
-module.exports = { summarizeEmail, analyzeEmail, draftReply, suggestDeletions };
+module.exports = { summarizeEmail, analyzeEmail, draftReply, suggestDeletions, summarizeArticle };

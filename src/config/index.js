@@ -12,6 +12,10 @@ const config = {
     apiKey: process.env.GEMINI_API_KEY,
     model: process.env.GEMINI_MODEL || 'gemini-flash-lite-latest',
   },
+  weather: {
+    apiKey: process.env.WEATHER_API_KEY,
+    defaultLocation: process.env.WEATHER_DEFAULT_LOCATION || 'Bangalore',
+  },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
