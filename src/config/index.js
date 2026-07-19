@@ -21,6 +21,12 @@ const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/gmail/auth/callback',
   },
+  linkedin: {
+    clientId: process.env.LINKEDIN_CLIENT_ID,
+    clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+    redirectUri:
+      process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:5000/api/social/linkedin/auth/callback',
+  },
   webAppUrl: process.env.WEB_APP_URL || 'http://localhost:5174',
 };
 

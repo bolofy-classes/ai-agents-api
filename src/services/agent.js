@@ -178,4 +178,49 @@ ${list}`;
   }
 }
 
-module.exports = { summarizeEmail, analyzeEmail, draftReply, suggestDeletions, summarizeArticle };
+/**
+ * Generate platform-tuned social posts from a single user query.
+ * @param {string} query What the user wants to post about.
+ * @returns {Promise<{linkedin:string, x:string, instagram:string}>}
+ */
+async function generateSocialPosts(query) {
+  const ai = getClient();
+  const prompt = `You are a social media copywriter. Write a ready-to-publish post for EACH platform below, all about this topic:
+
+"${query}"
+
+Tailor tone and format to each platform:
+- linkedin: professional and insightful, 1-3 short paragraphs, may include a few relevant hashtags at the end.
+- x: punchy and concise, MUST be at most 280 characters total (including hashtags), 1-3 hashtags.
+- instagram: warm and casual, use tasteful emojis, end with 3-6 relevant hashtags.
+
+Respond with STRICT JSON only, no preamble:
+{ "linkedin": "…", "x": "…", "instagram": "…" }`;
+
+  const res = await ai.models.generateContent({
+    model: config.gemini.model,
+    contents: prompt,
+    config: { responseMimeType: 'application/json' },
+  });
+
+  try {
+    const parsed = parseJson(res.text);
+    return {
+      linkedin: (parsed.linkedin || '').trim(),
+      x: (parsed.x || '').trim(),
+      instagram: (parsed.instagram || '').trim(),
+    };
+  } catch {
+    const fallback = (res.text || '').trim();
+    return { linkedin: fallback, x: fallback.slice(0, 280), instagram: fallback };
+  }
+}
+
+module.exports = {
+  summarizeEmail,
+  analyzeEmail,
+  draftReply,
+  suggestDeletions,
+  summarizeArticle,
+  generateSocialPosts,
+};
