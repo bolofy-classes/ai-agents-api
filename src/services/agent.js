@@ -179,11 +179,33 @@ ${list}`;
 }
 
 /**
+ * Insert `footer` directly above the trailing hashtag block of a post (or at
+ * the very end if no hashtags are found to anchor to).
+ * @param {string} content
+ * @param {string} [footer]
+ * @returns {string}
+ */
+function insertFooterAboveHashtags(content, footer) {
+  const trimmedFooter = (footer || '').trim();
+  const text = (content || '').trimEnd();
+  if (!trimmedFooter) return text;
+
+  const match = text.match(/(?<=^|\s)(#[^\s#]+(?:\s+#[^\s#]+)*)\s*$/);
+  if (match) {
+    const before = text.slice(0, match.index).trimEnd();
+    const hashtags = match[1];
+    return before ? `${before}\n\n${trimmedFooter}\n\n${hashtags}` : `${trimmedFooter}\n\n${hashtags}`;
+  }
+  return `${text}\n\n${trimmedFooter}`;
+}
+
+/**
  * Generate platform-tuned social posts from a single user query.
  * @param {string} query What the user wants to post about.
+ * @param {string} [footer] Optional text inserted just above the hashtags on every post.
  * @returns {Promise<{linkedin:string, x:string, instagram:string}>}
  */
-async function generateSocialPosts(query) {
+async function generateSocialPosts(query, footer) {
   const ai = getClient();
   const prompt = `You are a social media copywriter. Write a ready-to-publish post for EACH platform below, all about this topic:
 
@@ -206,12 +228,12 @@ Respond with STRICT JSON only, no preamble:
   try {
     const parsed = parseJson(res.text);
     return {
-      linkedin: (parsed.linkedin || '').trim(),
-      x: (parsed.x || '').trim(),
-      instagram: (parsed.instagram || '').trim(),
+      linkedin: insertFooterAboveHashtags((parsed.linkedin || '').trim(), footer),
+      x: insertFooterAboveHashtags((parsed.x || '').trim(), footer),
+      instagram: insertFooterAboveHashtags((parsed.instagram || '').trim(), footer),
     };
   } catch {
-    const fallback = (res.text || '').trim();
+    const fallback = insertFooterAboveHashtags((res.text || '').trim(), footer);
     return { linkedin: fallback, x: fallback.slice(0, 280), instagram: fallback };
   }
 }

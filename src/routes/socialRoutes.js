@@ -15,6 +15,9 @@ router.delete('/linkedin/disconnect', protect, ctrl.disconnect);
 router.post('/generate', protect, ctrl.generate);
 router.get('/analytics', protect, ctrl.analytics);
 
+router.get('/schedule', protect, ctrl.getSchedule);
+router.put('/schedule', protect, ctrl.updateSchedule);
+
 router.get('/posts', protect, ctrl.listPosts);
 router.post('/posts', protect, ctrl.createPost);
 router.put('/posts/:id', protect, ctrl.updatePost);

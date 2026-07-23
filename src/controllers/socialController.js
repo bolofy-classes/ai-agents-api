@@ -1,11 +1,14 @@
+const cron = require('node-cron');
 const asyncHandler = require('../helpers/asyncHandler');
 const { success, error } = require('../helpers/response');
 const { signToken, verifyToken } = require('../helpers/jwt');
 const config = require('../config');
 const agentSvc = require('../services/agent');
 const linkedinSvc = require('../services/linkedin');
+const schedulerSvc = require('../services/scheduler');
 const LinkedInAccount = require('../models/LinkedInAccount');
 const SocialPost = require('../models/SocialPost');
+const SocialSchedule = require('../models/SocialSchedule');
 
 // LinkedIn access tokens are typically valid for ~60 days.
 const DEFAULT_TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000;
@@ -104,7 +107,8 @@ const generate = asyncHandler(async (req, res) => {
   const query = (req.body?.query || '').trim();
   if (!query) return error(res, { message: 'query is required', status: 400 });
 
-  const posts = await agentSvc.generateSocialPosts(query);
+  const schedule = await SocialSchedule.findOne({ user: req.user._id }).select('footer');
+  const posts = await agentSvc.generateSocialPosts(query, schedule?.footer);
   return success(res, { message: 'Posts generated', data: { query, posts } });
 });
 
@@ -322,6 +326,56 @@ const analytics = asyncHandler(async (req, res) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Auto-posting schedule (cron)
+// ---------------------------------------------------------------------------
+
+/**
+ * @route GET /api/social/schedule  (protected)
+ */
+const getSchedule = asyncHandler(async (req, res) => {
+  let schedule = await SocialSchedule.findOne({ user: req.user._id });
+  if (!schedule) {
+    schedule = await SocialSchedule.create({ user: req.user._id });
+  }
+  return success(res, { data: { schedule } });
+});
+
+/**
+ * @route PUT /api/social/schedule  (protected)  { enabled?, cron?, platform?, topic?, autoPublish? }
+ */
+const updateSchedule = asyncHandler(async (req, res) => {
+  const { enabled, cron: cronExpr, platform, topic, footer, autoPublish } = req.body || {};
+
+  const update = {};
+  if (typeof enabled === 'boolean') update.enabled = enabled;
+  if (typeof cronExpr === 'string') {
+    if (!cron.validate(cronExpr.trim())) {
+      return error(res, { message: 'Invalid cron expression', status: 400 });
+    }
+    update.cron = cronExpr.trim();
+  }
+  if (platform) {
+    if (!['linkedin', 'x', 'instagram'].includes(platform)) {
+      return error(res, { message: 'platform must be linkedin, x, or instagram', status: 400 });
+    }
+    update.platform = platform;
+  }
+  if (typeof topic === 'string') update.topic = topic.trim();
+  if (typeof footer === 'string') update.footer = footer.trim();
+  if (typeof autoPublish === 'boolean') update.autoPublish = autoPublish;
+
+  const schedule = await SocialSchedule.findOneAndUpdate(
+    { user: req.user._id },
+    { user: req.user._id, ...update },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  await schedulerSvc.reschedule(req.user._id);
+
+  return success(res, { message: 'Schedule saved', data: { schedule } });
+});
+
 module.exports = {
   getAuthUrl,
   oauthCallback,
@@ -336,4 +390,6 @@ module.exports = {
   markPosted,
   refreshMetrics,
   analytics,
+  getSchedule,
+  updateSchedule,
 };
