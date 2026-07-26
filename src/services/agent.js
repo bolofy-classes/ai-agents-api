@@ -238,6 +238,80 @@ Respond with STRICT JSON only, no preamble:
   }
 }
 
+/**
+ * Suggest classic top/bottom meme captions from a topic.
+ * @param {string} topic
+ * @returns {Promise<{top:string, bottom:string}>}
+ */
+async function generateMemeCaptions(topic) {
+  const ai = getClient();
+  const prompt = `You are a meme caption writer. For the topic below, write a classic two-line meme in the "top text / bottom text" format. Keep each line SHORT and punchy (max ~8 words), funny, and set up/punchline style.
+
+Topic: "${topic}"
+
+Respond with STRICT JSON only, no preamble:
+{ "top": "…", "bottom": "…" }`;
+
+  const res = await ai.models.generateContent({
+    model: config.gemini.model,
+    contents: prompt,
+    config: { responseMimeType: 'application/json' },
+  });
+
+  try {
+    const parsed = parseJson(res.text);
+    return {
+      top: (parsed.top || '').trim(),
+      bottom: (parsed.bottom || '').trim(),
+    };
+  } catch {
+    // Fall back to splitting the raw text into two lines.
+    const lines = (res.text || '').trim().split('\n').filter(Boolean);
+    return { top: (lines[0] || '').trim(), bottom: (lines[1] || '').trim() };
+  }
+}
+
+/**
+ * Generate an original meme image from a text prompt via a Gemini image model.
+ * @param {string} prompt
+ * @returns {Promise<{base64:string, mimeType:string}>} base64 has no data: prefix.
+ */
+async function generateMemeImage(prompt) {
+  const ai = getClient();
+
+  let res;
+  try {
+    res = await ai.models.generateContent({
+      model: config.gemini.imageModel,
+      contents: `Create a funny, original meme image. ${prompt}. Bold, high-contrast, shareable, with clear subjects.`,
+      config: { responseModalities: ['IMAGE'] },
+    });
+  } catch (e) {
+    // Image models are often gated/paid (quota, billing, or access). Surface a
+    // short, user-friendly message instead of the provider's raw error blob.
+    const status = e?.status || e?.code;
+    const err = new Error(
+      status === 429
+        ? 'AI image generation is unavailable on this API key (quota/billing). Try the Template mode, or configure a paid image model via GEMINI_IMAGE_MODEL.'
+        : 'AI image generation failed. Check GEMINI_IMAGE_MODEL and that your key has image access.'
+    );
+    err.status = 502;
+    throw err;
+  }
+
+  const parts = res.candidates?.[0]?.content?.parts || [];
+  const imgPart = parts.find((p) => p.inlineData?.data);
+  if (!imgPart) {
+    const err = new Error('Image generation returned no image');
+    err.status = 502;
+    throw err;
+  }
+  return {
+    base64: imgPart.inlineData.data,
+    mimeType: imgPart.inlineData.mimeType || 'image/png',
+  };
+}
+
 module.exports = {
   summarizeEmail,
   analyzeEmail,
@@ -245,4 +319,6 @@ module.exports = {
   suggestDeletions,
   summarizeArticle,
   generateSocialPosts,
+  generateMemeCaptions,
+  generateMemeImage,
 };

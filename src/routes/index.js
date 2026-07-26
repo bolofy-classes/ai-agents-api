@@ -5,6 +5,7 @@ const agentRoutes = require('./agentRoutes');
 const newsRoutes = require('./newsRoutes');
 const weatherRoutes = require('./weatherRoutes');
 const socialRoutes = require('./socialRoutes');
+const memeRoutes = require('./memeRoutes');
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use('/agent', agentRoutes);
 router.use('/news', newsRoutes);
 router.use('/weather', weatherRoutes);
 router.use('/social', socialRoutes);
+router.use('/memes', memeRoutes);
 
 module.exports = router;
