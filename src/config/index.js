@@ -11,6 +11,7 @@ const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
     model: process.env.GEMINI_MODEL || 'gemini-flash-lite-latest',
+    imageModel: process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image',
   },
   weather: {
     apiKey: process.env.WEATHER_API_KEY,
