@@ -10,6 +10,7 @@ const TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
 const UGC_POSTS_URL = 'https://api.linkedin.com/v2/ugcPosts';
 const SOCIAL_ACTIONS_URL = 'https://api.linkedin.com/v2/socialActions';
+const REGISTER_UPLOAD_URL = 'https://api.linkedin.com/v2/assets?action=registerUpload';
 
 // openid/profile/email → identify the member; w_member_social → post on their behalf.
 const SCOPES = ['openid', 'profile', 'email', 'w_member_social'];
@@ -133,6 +134,113 @@ async function createTextPost(accessToken, authorSub, text) {
 }
 
 /**
+ * Publish an image share on behalf of the member. Unlike createTextPost (a
+ * single call), LinkedIn image posting is a 3-step flow: register the upload,
+ * PUT/POST the raw bytes to the returned upload URL, then create a UGC post
+ * that references the resulting asset URN.
+ * @param {string} accessToken
+ * @param {string} authorSub  member OpenID sub
+ * @param {string} caption    post commentary (may be empty)
+ * @param {Buffer} imageBuffer  raw image bytes
+ * @param {string} [mimeType]
+ * @returns {Promise<{urn, url}>}
+ */
+async function createImagePost(accessToken, authorSub, caption, imageBuffer, mimeType = 'image/png') {
+  const owner = `urn:li:person:${authorSub}`;
+
+  // Step 1 — register the upload.
+  const registerRes = await fetch(REGISTER_UPLOAD_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0',
+    },
+    body: JSON.stringify({
+      registerUploadRequest: {
+        recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+        owner,
+        serviceRelationships: [
+          { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
+        ],
+      },
+    }),
+  });
+
+  if (!registerRes.ok) {
+    const detail = await registerRes.text();
+    throw new Error(`LinkedIn upload register failed (${registerRes.status}): ${detail}`);
+  }
+
+  const registerData = await registerRes.json();
+  const asset = registerData?.value?.asset;
+  const uploadUrl =
+    registerData?.value?.uploadMechanism?.[
+      'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'
+    ]?.uploadUrl;
+  if (!asset || !uploadUrl) {
+    throw new Error('LinkedIn did not return an upload URL');
+  }
+
+  // Step 2 — upload the raw bytes to the returned media host.
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': mimeType,
+    },
+    body: imageBuffer,
+  });
+
+  if (!uploadRes.ok) {
+    const detail = await uploadRes.text();
+    throw new Error(`LinkedIn image upload failed (${uploadRes.status}): ${detail}`);
+  }
+
+  // Step 3 — create the UGC post referencing the uploaded asset.
+  const payload = {
+    author: owner,
+    lifecycleState: 'PUBLISHED',
+    specificContent: {
+      'com.linkedin.ugc.ShareContent': {
+        shareCommentary: { text: caption || '' },
+        shareMediaCategory: 'IMAGE',
+        media: [
+          {
+            status: 'READY',
+            media: asset,
+            title: { text: 'Meme' },
+            description: { text: caption || '' },
+          },
+        ],
+      },
+    },
+    visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+  };
+
+  const res = await fetch(UGC_POSTS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`LinkedIn image post failed (${res.status}): ${detail}`);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  const urn = data.id || res.headers.get('x-restli-id');
+  if (!urn) throw new Error('LinkedIn did not return a post id');
+
+  return { urn, url: `https://www.linkedin.com/feed/update/${urn}/` };
+}
+
+/**
  * Fetch like/comment counts for one of the member's own posts.
  * Returns nulls (never throws) so the caller can fall back to manual entry
  * when the app lacks the required social-actions permission.
@@ -164,5 +272,6 @@ module.exports = {
   getProfile,
   getAuthorizedAccount,
   createTextPost,
+  createImagePost,
   getPostMetrics,
 };

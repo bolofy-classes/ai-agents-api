@@ -1,9 +1,11 @@
 const app = require('./app');
 const connectDB = require('./config/db');
 const config = require('./config');
+const scheduler = require('./services/scheduler');
 
 async function start() {
   await connectDB();
+  await scheduler.start();
 
   const server = app.listen(config.port, () => {
     console.log(`🚀 Server running in ${config.env} mode on port ${config.port}`);

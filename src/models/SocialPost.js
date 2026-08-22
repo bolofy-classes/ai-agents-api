@@ -18,6 +18,9 @@ const socialPostSchema = new mongoose.Schema(
     },
     content: { type: String, required: true },
     prompt: String, // the original query that generated this post
+    // Image posts (e.g. from the Memes Generator). Default keeps text posts unchanged.
+    mediaCategory: { type: String, enum: ['none', 'image'], default: 'none' },
+    imageUrl: String, // optional hosted URL; LinkedIn stores the asset itself
     status: {
       type: String,
       enum: ['draft', 'posted'],
